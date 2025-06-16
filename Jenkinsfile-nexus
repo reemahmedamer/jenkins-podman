@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    environment {
+        REGISTRY_HOST = 'nexus.local'
+        IMAGE_NAME = 'local-docker/simple-app' 
+        FULL_IMAGE = "${REGISTRY_HOST}/${IMAGE_NAME}"
+        NEXUS_CREDS = credentials('nexus-creds')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', 
+                    url: 'https://github.com/reemahmedamer/jenkins-podman.git'
+            }
+        }
+
+        stage('Build Image with Podman') {
+            steps {
+                script {
+                    sh "podman build -t ${FULL_IMAGE}:${BUILD_NUMBER} ."
+                    sh "podman tag ${FULL_IMAGE}:${BUILD_NUMBER} ${FULL_IMAGE}:latest"
+                }
+            }
+        }
+
+        stage('Login to Nexus') {
+            steps {
+                sh "podman login -u ${NEXUS_CREDS_USR} -p ${NEXUS_CREDS_PSW} ${REGISTRY_HOST}"
+            }
+        }
+
+        stage('Push Image to Nexus') {
+            steps {
+                script {
+                    sh "podman push ${FULL_IMAGE}:${BUILD_NUMBER}"
+                    sh "podman push ${FULL_IMAGE}:latest"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "podman logout ${REGISTRY_HOST}"
+            script {
+                sh "podman rmi ${FULL_IMAGE}:${BUILD_NUMBER} || true"
+                sh "podman rmi ${FULL_IMAGE}:latest || true"
+            }
+        }
+    }
+}
