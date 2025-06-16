@@ -1,5 +1,7 @@
 pipeline {
-    agent any
+     agent {
+        label 'podman-agent'
+    }
 
     environment {
         REGISTRY_HOST = 'nexus.local'
